@@ -1,11 +1,14 @@
 import json
+import logging
+from datetime import datetime
+
 from dotenv import load_dotenv
 from time import sleep
 
 from google.cloud import pubsub_v1
 import os
 
-from query_pg import get_contract_addresses, get_token_details
+from query_pg import get_contract_addresses, get_token_details, pg_connect
 
 load_dotenv()
 # Also need GOOGLE_APPLICATION_CREDENTIALS in env.
@@ -20,8 +23,8 @@ def publish_message(data: str):
     # Data must be a bytestring
     data = data.encode("utf-8")
     # When you publish a message, the client returns a future.
-    future = publisher.publish(topic_path, data)
-    print(f"Published message ID: {future.result()}")
+    publisher.publish(topic_path, data)
+    # print(f"Published message ID: {future.result()}")
 
 
 def contract_message(contract_address: str) -> str:
@@ -37,25 +40,24 @@ def token_message(address: str, token_id: str, token_uri: str) -> str:
 
 
 if __name__ == "__main__":
-    N = 10
-
+    N = 1000
+    pg_connection = pg_connect()
     while 1:
         # Post Contract Stuff:
-        print("Contracts")
-        contract_addresses = get_contract_addresses(N)
-        if len(contract_addresses) < N:
-            break
+        # print("Contracts")
+        # contract_addresses = get_contract_addresses(N)
+        # if len(contract_addresses) == 0:
+        #     break
+        #
+        # for address in contract_addresses:
+        #     publish_message(contract_message(address))
 
-        for address in contract_addresses:
-            publish_message(contract_message(address))
-
-        print("Tokens")
-        M = 5 * N
-        tokens = get_token_details(M)
-        if len(tokens) < M:
+        print(f"Posting {N} token requests", datetime.now())
+        tokens = get_token_details(pg_connection, N)
+        if len(tokens) < N:
             break
 
         for address, t_id, uri in tokens:
             message = token_message(address, t_id, uri)
             publish_message(message)
-        sleep(10)
+        sleep(20)

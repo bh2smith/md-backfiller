@@ -9,16 +9,16 @@ def convert_bytes(memory_view: Any) -> str:
     return "0x" + byte_data.hex()
 
 
-def connect():
+def pg_connect() -> psycopg2.extensions.connection:
     conn = psycopg2.connect(os.environ.get("DB_CONNECTION_STRING"))
     with conn.cursor() as cursor:
         cursor.execute("SET search_path TO mainnet")
     return conn
 
 
-def get_contract_addresses(limit: int) -> list[str]:
-    conn = connect()
-
+def get_contract_addresses(
+    conn: psycopg2.extensions.connection, limit: int
+) -> list[str]:
     contract_query = (
         f"SELECT address FROM token_contracts WHERE abi_id IS NULL LIMIT {limit};"
     )
@@ -30,12 +30,11 @@ def get_contract_addresses(limit: int) -> list[str]:
             return [convert_bytes(row[0]) for row in rows]
     except Exception as e:
         print(f"An error occurred: {e}")
-    finally:
-        conn.close()
 
 
-def get_token_details(limit: int) -> list[(str, str)]:
-    conn = connect()
+def get_token_details(
+    conn: psycopg2.extensions.connection, limit: int
+) -> list[(str, str)]:
     contract_query = f"""
         SELECT contract_address, token_id, token_uri
         FROM nfts
@@ -50,5 +49,3 @@ def get_token_details(limit: int) -> list[(str, str)]:
             return [(convert_bytes(row[0]), str(row[1]), row[2]) for row in rows]
     except Exception as e:
         print(f"An error occurred: {e}")
-    finally:
-        conn.close()
