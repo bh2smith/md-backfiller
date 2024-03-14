@@ -1,5 +1,4 @@
 import json
-import logging
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -8,7 +7,7 @@ from time import sleep
 from google.cloud import pubsub_v1
 import os
 
-from query_pg import get_contract_addresses, get_token_details, pg_connect
+from query_pg import get_contract_addresses, get_token_details, pg_connect, near_query
 
 load_dotenv()
 # Also need GOOGLE_APPLICATION_CREDENTIALS in env.
@@ -39,25 +38,27 @@ def token_message(address: str, token_id: str, token_uri: str) -> str:
     return json.dumps(message_dict)
 
 
+def near_message(contract_id: str, token_id: str, minter: str) -> str:
+    message_dict = {
+        "contract_id": contract_id,
+        "token_ids": [token_id],
+        "minter": minter,
+    }
+    return json.dumps(message_dict)
+
+
+def chunk_list(lst, chunk_size):
+    return [lst[i:i + chunk_size] for i in range(0, len(lst), chunk_size)]
+
+
 if __name__ == "__main__":
-    N = 1000
+    limit = 300000
+    load_dotenv()
     pg_connection = pg_connect()
-    while 1:
-        # Post Contract Stuff:
-        # print("Contracts")
-        # contract_addresses = get_contract_addresses(N)
-        # if len(contract_addresses) == 0:
-        #     break
-        #
-        # for address in contract_addresses:
-        #     publish_message(contract_message(address))
-
-        print(f"Posting {N} token requests", datetime.now())
-        tokens = get_token_details(pg_connection, N)
-        if len(tokens) < N:
-            break
-
-        for address, t_id, uri in tokens:
-            message = token_message(address, t_id, uri)
+    tokens = near_query(pg_connection, limit)
+    for chunk in chunk_list(tokens, 25):
+        print(f"Posting {len(chunk)} token requests", datetime.now())
+        for a, b, c in tokens:
+            message = near_message(a, b, c)
             publish_message(message)
-        sleep(20)
+        sleep(1)
